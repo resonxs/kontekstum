@@ -69,8 +69,9 @@ const getAllValidWords = () => {
 	const validWords = new Set()
 
 	for (const word in WORDS_DB) {
+		const key = word as keyof typeof WORDS_DB
 		validWords.add(normalizeWord(word))
-		for (const similar of WORDS_DB[word]) {
+		for (const similar of WORDS_DB[key]) {
 			validWords.add(normalizeWord(similar))
 		}
 	}
