@@ -1,10 +1,20 @@
 'use client'
+
 import { ArrowRight, EllipsisVertical, Sparkle, X } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import wordsData from './words.json'
 
-const WORDS_DB = wordsData
+// Типы
+type WordsDB = Record<string, string[]>
+
+type Guess = {
+	word: string
+	rank: number
+}
+
+// Приведение JSON к типу с утверждением
+const WORDS_DB = wordsData as WordsDB
 
 const normalizeWord = (word: string): string => {
 	return word.toLowerCase().replace(/ё/g, 'е')
@@ -65,13 +75,13 @@ const isPossibleRussianWord = (word: string): boolean => {
 	return true
 }
 
-const getAllValidWords = () => {
-	const validWords = new Set()
+const getAllValidWords = (): Set<string> => {
+	const validWords = new Set<string>()
+	const entries = Object.entries(WORDS_DB) as [string, string[]][]
 
-	for (const word in WORDS_DB) {
-		const key = word as keyof typeof WORDS_DB
+	for (const [word, similars] of entries) {
 		validWords.add(normalizeWord(word))
-		for (const similar of WORDS_DB[key]) {
+		for (const similar of similars) {
 			validWords.add(normalizeWord(similar))
 		}
 	}
@@ -79,22 +89,22 @@ const getAllValidWords = () => {
 	return validWords
 }
 
-const VALID_WORDS = getAllValidWords()
+const VALID_WORDS: Set<string> = getAllValidWords()
 
-const getRandomSecretWord = () => {
+const getRandomSecretWord = (): string => {
 	const words = Object.keys(WORDS_DB)
 	const randomIndex = Math.floor(Math.random() * words.length)
 	return normalizeWord(words[randomIndex])
 }
 
-const getWordRank = (secretWord, guess) => {
-	const originalSecretWord = Object.keys(WORDS_DB).find(
-		key => normalizeWord(key) === secretWord
+const getWordRank = (secretWord: string, guess: string): number | null => {
+	const entry = Object.entries(WORDS_DB).find(
+		([key]) => normalizeWord(key) === secretWord
 	)
-	if (!originalSecretWord) return null
 
-	const similarWords = WORDS_DB[originalSecretWord]
-	if (!similarWords) return null
+	if (!entry) return null
+
+	const [originalSecretWord, similarWords] = entry
 
 	if (guess === secretWord) return 1
 
@@ -104,22 +114,24 @@ const getWordRank = (secretWord, guess) => {
 	return index + 2
 }
 
-const isWordValid = word => {
+const isWordValid = (word: string): boolean => {
 	return VALID_WORDS.has(normalizeWord(word))
 }
 
 export default function Home() {
-	const [secretWord, setSecretWord] = useState(() => getRandomSecretWord())
-	const [inputValue, setInputValue] = useState('')
-	const [guesses, setGuesses] = useState([])
-	const [gameWon, setGameWon] = useState(false)
-	const [message, setMessage] = useState('')
-	const [errorMessage, setErrorMessage] = useState('')
-	const [hintIndex, setHintIndex] = useState(null)
-	const [showInfo, setShowInfo] = useState(false)
-	const [animateGuess, setAnimateGuess] = useState(null)
+	const [secretWord, setSecretWord] = useState<string>(() =>
+		getRandomSecretWord()
+	)
+	const [inputValue, setInputValue] = useState<string>('')
+	const [guesses, setGuesses] = useState<Guess[]>([])
+	const [gameWon, setGameWon] = useState<boolean>(false)
+	const [message, setMessage] = useState<string>('')
+	const [errorMessage, setErrorMessage] = useState<string>('')
+	const [hintIndex, setHintIndex] = useState<number | null>(null)
+	const [showInfo, setShowInfo] = useState<boolean>(false)
+	const [animateGuess, setAnimateGuess] = useState<number | null>(null)
 
-	const startNewGame = () => {
+	const startNewGame = (): void => {
 		const newWord = getRandomSecretWord()
 		setSecretWord(newWord)
 		setGuesses([])
@@ -130,7 +142,7 @@ export default function Home() {
 		setHintIndex(null)
 	}
 
-	const addGuess = (word, rank) => {
+	const addGuess = (word: string, rank: number): void => {
 		setGuesses(prev => {
 			const existing = prev.find(g => g.word === normalizeWord(word))
 			if (existing) return prev
@@ -141,26 +153,27 @@ export default function Home() {
 		setTimeout(() => setAnimateGuess(null), 500)
 	}
 
-	const getHint = () => {
+	const getHint = (): void => {
 		if (gameWon) {
 			setErrorMessage('игра уже завершена, начните новую')
 			return
 		}
 
-		const originalSecretWord = Object.keys(WORDS_DB).find(
-			key => normalizeWord(key) === secretWord
+		const entry = Object.entries(WORDS_DB).find(
+			([key]) => normalizeWord(key) === secretWord
 		)
 
-		if (!originalSecretWord) return
+		if (!entry) return
 
-		const similarWords = WORDS_DB[originalSecretWord]
+		const [originalSecretWord, similarWords] = entry
 
 		if (!similarWords || similarWords.length === 0) {
 			setErrorMessage('нет подсказок для этого слова')
 			return
 		}
 
-		let nextIndex = hintIndex === null ? similarWords.length - 1 : hintIndex - 1
+		let nextIndex: number =
+			hintIndex === null ? similarWords.length - 1 : hintIndex - 1
 
 		if (nextIndex < 0) {
 			setMessage(
@@ -171,15 +184,15 @@ export default function Home() {
 			return
 		}
 
-		const hintWord = similarWords[nextIndex]
-		const hintRank = nextIndex + 2
+		const hintWord: string = similarWords[nextIndex]
+		const hintRank: number = nextIndex + 2
 
 		setHintIndex(nextIndex)
 		setMessage(`подсказка: "${hintWord}" (ранг ${hintRank})`)
 		addGuess(hintWord, hintRank)
 	}
 
-	const handleSubmit = e => {
+	const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
 		e.preventDefault()
 		setErrorMessage('')
 		setMessage('')
@@ -190,7 +203,7 @@ export default function Home() {
 			return
 		}
 
-		const guessRaw = inputValue.trim().toLowerCase()
+		const guessRaw: string = inputValue.trim().toLowerCase()
 
 		if (!isRussianWord(guessRaw)) {
 			setErrorMessage(`"${guessRaw}" — используйте только русские буквы`)
@@ -202,9 +215,9 @@ export default function Home() {
 			return
 		}
 
-		const guess = normalizeWord(guessRaw)
+		const guess: string = normalizeWord(guessRaw)
 
-		const alreadyGuessed = guesses.some(g => g.word === guess)
+		const alreadyGuessed: boolean = guesses.some(g => g.word === guess)
 		if (alreadyGuessed) {
 			setErrorMessage(`"${guess}" — вы уже вводили это слово`)
 			return
@@ -223,10 +236,10 @@ export default function Home() {
 			return
 		}
 
-		const rank = getWordRank(secretWord, guess)
+		const rank: number | null = getWordRank(secretWord, guess)
 
 		if (rank === null) {
-			const randomRank = Math.floor(Math.random() * 700) + 300
+			const randomRank: number = Math.floor(Math.random() * 700) + 300
 			addGuess(guess, randomRank)
 			setMessage(`"${guess}" — ранг ${randomRank}`)
 		} else {
@@ -237,7 +250,7 @@ export default function Home() {
 		setInputValue('')
 	}
 
-	const getRankColor = rank => {
+	const getRankColor = (rank: number): string => {
 		if (rank === 1) return 'text-accent'
 		if (rank <= 5) return 'text-blue-400'
 		if (rank <= 15) return 'text-text-secondary'
@@ -310,7 +323,9 @@ export default function Home() {
 				<input
 					type="text"
 					value={inputValue}
-					onChange={e => setInputValue(e.target.value)}
+					onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+						setInputValue(e.target.value)
+					}
 					placeholder="введите слово"
 					className="flex-1 bg-surface border border-border rounded-xl px-5 py-3.5 text-text-primary placeholder-text-secondary text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/50 transition-all duration-300 hover:border-accent/50"
 					autoComplete="off"
@@ -334,7 +349,7 @@ export default function Home() {
 						<span>слово</span>
 					</div>
 
-					{guesses.map((guess, index) => (
+					{guesses.map((guess: Guess, index: number) => (
 						<div
 							key={index}
 							className={`bg-surface rounded-xl p-3 flex items-center hover:bg-surface-hover transition-all duration-300 hover-lift cursor-pointer ${
@@ -477,11 +492,11 @@ export default function Home() {
 								>
 									<h3 className="text-accent font-bold mb-2 text-lg">пример</h3>
 									<p className="text-text-secondary text-sm leading-relaxed">
-										если загадано слово "атака", то:
+										если загадано слово &quot;атака&quot;, то:
 										<br />
-										ранг 1 — "атака" (загаданное слово)
+										ранг 1 — &quot;атака&quot; (загаданное слово)
 										<br />
-										ранг 2 — "нападение" (самое очевидное)
+										ранг 2 — &quot;нападение&quot; (самое очевидное)
 										<br />
 										ранг 3 и выше — другие ассоциации
 									</p>
@@ -501,7 +516,9 @@ export default function Home() {
 										</li>
 										<li className="flex items-start gap-2">
 											<span className="text-accent">•</span>
-											<span>бессмыслица вроде "ыфлвофлвы" не принимается</span>
+											<span>
+												бессмыслица вроде &quot;ыфлвофлвы&quot; не принимается
+											</span>
 										</li>
 										<li className="flex items-start gap-2">
 											<span className="text-accent">•</span>
